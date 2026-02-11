@@ -1,4 +1,3 @@
-// script.js — robust candy counter (no dependency on cv.COLOR_* constants)
 function startCandyCounter() {
     const video = document.getElementById("video");
     const canvas = document.getElementById("canvas");
@@ -17,120 +16,69 @@ function startCandyCounter() {
         .catch(err => {
             statusDiv.innerText = "Camera error";
             statusDiv.style.color = "red";
-            console.error("getUserMedia error:", err);
+            console.error(err);
         });
 
-    video.onloadedmetadata = () => {
-        const width = video.videoWidth;
-        const height = video.videoHeight;
+    video.addEventListener("loadeddata", () => {
+        statusDiv.innerText = "Processing...";
 
-        console.log("Video size:", width, height);
+        const frameWidth = video.videoWidth || video.width;
+        const frameHeight = video.videoHeight || video.height;
 
-        if (!width || !height) {
+        if (!frameWidth || !frameHeight) {
             statusDiv.innerText = "Video size error";
             statusDiv.style.color = "red";
+            console.error("Invalid video dimensions", { frameWidth, frameHeight });
             return;
         }
 
-        // Match canvas to camera resolution
-        canvas.width = width;
-        canvas.height = height;
-
-        statusDiv.innerText = "Processing...";
+        canvas.width = frameWidth;
+        canvas.height = frameHeight;
 
         const cap = new cv.VideoCapture(video);
-
-        const src = new cv.Mat(height, width, cv.CV_8UC4);
-        const gray = new cv.Mat();
-        const thresh = new cv.Mat();
-
-        // helper: safe conversion to gray without relying on cv.COLOR_RGBA2GRAY constant
-        function convertToGraySafely(srcMat, dstGray) {
-            // If the built-in constant exists and is numeric, use cvtColor
-            if (typeof cv.COLOR_RGBA2GRAY === 'number') {
-                cv.cvtColor(srcMat, dstGray, cv.COLOR_RGBA2GRAY);
-                return;
-            }
-
-            // fallback: split RGBA channels and compute weighted sum:
-            // gray = 0.299*R + 0.587*G + 0.114*B
-            const rgba = new cv.MatVector();
-            try {
-                cv.split(srcMat, rgba); // [R, G, B, A] for HTML video -> Mat
-                const r = rgba.get(0);
-                const g = rgba.get(1);
-                const b = rgba.get(2);
-
-                const tmp = new cv.Mat();
-                // tmp = 0.299*R + 0.587*G
-                cv.addWeighted(r, 0.299, g, 0.587, 0, tmp);
-                // dstGray = tmp + 0.114*B
-                cv.addWeighted(tmp, 1.0, b, 0.114, 0, dstGray);
-
-                // cleanup
-                tmp.delete();
-                r.delete(); g.delete(); b.delete();
-            } finally {
-                rgba.delete();
-            }
-        }
+        const src = new cv.Mat(frameHeight, frameWidth, cv.CV_8UC4);
+        const rgb = new cv.Mat();
+        const hsv = new cv.Mat();
+        const mask = new cv.Mat();
+        const lowerYellow = new cv.Scalar(20, 100, 100, 0);
+        const upperYellow = new cv.Scalar(35, 255, 255, 255);
 
         function process() {
             try {
                 cap.read(src);
 
-                // If frame not ready yet, skip
-                if (src.empty() || src.cols === 0 || src.rows === 0) {
+                if (src.empty()) {
                     requestAnimationFrame(process);
                     return;
                 }
 
-                // Convert to grayscale (safe)
-                convertToGraySafely(src, gray);
+                // Use a 2-step conversion for broader OpenCV.js compatibility.
+                cv.cvtColor(src, rgb, cv.COLOR_RGBA2RGB);
+                cv.cvtColor(rgb, hsv, cv.COLOR_RGB2HSV);
+                cv.inRange(hsv, lowerYellow, upperYellow, mask);
 
-                // Binary threshold (Otsu)
-                cv.threshold(
-                    gray,
-                    thresh,
-                    0,
-                    255,
-                    cv.THRESH_BINARY + cv.THRESH_OTSU
-                );
-
-                // optional: morphological open to remove small noise
-                // (uncomment if needed)
-                // let M = cv.Mat.ones(3, 3, cv.CV_8U);
-                // cv.morphologyEx(thresh, thresh, cv.MORPH_OPEN, M);
-                // M.delete();
-
-                // Find contours
                 const contours = new cv.MatVector();
                 const hierarchy = new cv.Mat();
 
-                cv.findContours(
-                    thresh,
-                    contours,
-                    hierarchy,
+                cv.findContours(mask, contours, hierarchy,
                     cv.RETR_EXTERNAL,
-                    cv.CHAIN_APPROX_SIMPLE
-                );
+                    cv.CHAIN_APPROX_SIMPLE);
 
                 let count = 0;
                 for (let i = 0; i < contours.size(); i++) {
                     const contour = contours.get(i);
                     const area = cv.contourArea(contour);
                     contour.delete();
-
-                    // Minimum size filter (tune if needed)
-                    if (area > 200) count++;
+                    if (area > 300) count++;
                 }
 
                 contours.delete();
                 hierarchy.delete();
 
-                // Stability logic
                 history.push(count);
-                if (history.length > MAX_HISTORY) history.shift();
+                if (history.length > MAX_HISTORY) {
+                    history.shift();
+                }
 
                 let stable = false;
                 if (history.length === MAX_HISTORY) {
@@ -145,21 +93,25 @@ function startCandyCounter() {
                 } else {
                     const sorted = [...history].sort((a, b) => a - b);
                     const median = sorted[Math.floor(MAX_HISTORY / 2)];
-                    statusDiv.innerText = "Count: " + median;
-                    statusDiv.style.color = "lime";
+
+                    if (median === 60) {
+                        statusDiv.innerText = "OK";
+                        statusDiv.style.color = "lime";
+                    } else {
+                        statusDiv.innerText = "Count: " + median;
+                        statusDiv.style.color = "red";
+                    }
                 }
 
                 cv.imshow(canvas, src);
                 requestAnimationFrame(process);
-
             } catch (err) {
-                // More verbose console output to find which argument is undefined
-                console.error("Processing exception:", err);
                 statusDiv.innerText = "Processing error (see console)";
                 statusDiv.style.color = "red";
+                console.error(err);
             }
         }
 
         process();
-    };
+    }, { once: true });
 }
