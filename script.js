@@ -37,14 +37,9 @@ function startCandyCounter() {
 
         const cap = new cv.VideoCapture(video);
         const src = new cv.Mat(frameHeight, frameWidth, cv.CV_8UC4);
-        const rgb = new cv.Mat();
-        const hsv = new cv.Mat();
-        const mask = new cv.Mat();
-
-        // Some OpenCV.js builds don't accept cv.Scalar for inRange;
-        // use 1x1 Mat bounds for maximum compatibility.
-        const lowerYellow = cv.matFromArray(1, 1, cv.CV_8UC3, [20, 100, 100]);
-        const upperYellow = cv.matFromArray(1, 1, cv.CV_8UC3, [35, 255, 255]);
+        const gray = new cv.Mat();
+        const binary = new cv.Mat();
+        const kernel = cv.getStructuringElement(cv.MORPH_ELLIPSE, new cv.Size(3, 3));
 
         function process() {
             try {
@@ -55,14 +50,16 @@ function startCandyCounter() {
                     return;
                 }
 
-                cv.cvtColor(src, rgb, cv.COLOR_RGBA2RGB);
-                cv.cvtColor(rgb, hsv, cv.COLOR_RGB2HSV);
-                cv.inRange(hsv, lowerYellow, upperYellow, mask);
+                // Color-agnostic detection: segment bright candy-like blobs from grayscale image.
+                cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
+                cv.GaussianBlur(gray, gray, new cv.Size(5, 5), 0, 0, cv.BORDER_DEFAULT);
+                cv.threshold(gray, binary, 0, 255, cv.THRESH_BINARY + cv.THRESH_OTSU);
+                cv.morphologyEx(binary, binary, cv.MORPH_OPEN, kernel);
 
                 const contours = new cv.MatVector();
                 const hierarchy = new cv.Mat();
 
-                cv.findContours(mask, contours, hierarchy,
+                cv.findContours(binary, contours, hierarchy,
                     cv.RETR_EXTERNAL,
                     cv.CHAIN_APPROX_SIMPLE);
 
@@ -71,7 +68,9 @@ function startCandyCounter() {
                     const contour = contours.get(i);
                     const area = cv.contourArea(contour);
                     contour.delete();
-                    if (area > 300) count++;
+                    if (area > 120 && area < 5000) {
+                        count++;
+                    }
                 }
 
                 contours.delete();
