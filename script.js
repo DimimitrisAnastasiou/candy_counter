@@ -15,55 +15,52 @@ function startCandyCounter() {
         })
         .catch(err => {
             statusDiv.innerText = "Camera error";
-            statusDiv.style.color = "red";
             console.error(err);
         });
 
-    // Wait until real resolution is known
     video.onloadedmetadata = () => {
         const width = video.videoWidth;
         const height = video.videoHeight;
 
-        console.log("Video size:", width, height);
-
-        if (!width || !height) {
-            statusDiv.innerText = "Video size error";
-            statusDiv.style.color = "red";
-            return;
-        }
-
-        // Match canvas to camera resolution
         canvas.width = width;
         canvas.height = height;
 
         statusDiv.innerText = "Processing...";
 
         const cap = new cv.VideoCapture(video);
-        const src = new cv.Mat(height, width, cv.CV_8UC4);
-        const hsv = new cv.Mat();
-        const mask = new cv.Mat();
 
-        const lowerYellow = new cv.Scalar(20, 100, 100, 0);
-        const upperYellow = new cv.Scalar(35, 255, 255, 255);
+        const src = new cv.Mat(height, width, cv.CV_8UC4);
+        const gray = new cv.Mat();
+        const thresh = new cv.Mat();
 
         function process() {
             try {
                 cap.read(src);
 
-                // Safety check (prevents cvtColor crash)
-                if (src.empty()) {
+                // If frame not ready yet, skip
+                if (src.empty() || src.cols === 0 || src.rows === 0) {
                     requestAnimationFrame(process);
                     return;
                 }
 
-                cv.cvtColor(src, hsv, cv.COLOR_RGBA2HSV);
-                cv.inRange(hsv, lowerYellow, upperYellow, mask);
+                // Convert to grayscale
+                cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
 
+                // Binary threshold (auto)
+                cv.threshold(
+                    gray,
+                    thresh,
+                    0,
+                    255,
+                    cv.THRESH_BINARY + cv.THRESH_OTSU
+                );
+
+                // Find contours
                 const contours = new cv.MatVector();
                 const hierarchy = new cv.Mat();
 
                 cv.findContours(
-                    mask,
+                    thresh,
                     contours,
                     hierarchy,
                     cv.RETR_EXTERNAL,
@@ -75,13 +72,15 @@ function startCandyCounter() {
                     const contour = contours.get(i);
                     const area = cv.contourArea(contour);
                     contour.delete();
-                    if (area > 300) count++;
+
+                    // Minimum size filter
+                    if (area > 200) count++;
                 }
 
                 contours.delete();
                 hierarchy.delete();
 
-                // Stability history
+                // Stability logic
                 history.push(count);
                 if (history.length > MAX_HISTORY) history.shift();
 
@@ -99,13 +98,8 @@ function startCandyCounter() {
                     const sorted = [...history].sort((a, b) => a - b);
                     const median = sorted[Math.floor(MAX_HISTORY / 2)];
 
-                    if (median === 60) {
-                        statusDiv.innerText = "OK";
-                        statusDiv.style.color = "lime";
-                    } else {
-                        statusDiv.innerText = "Count: " + median;
-                        statusDiv.style.color = "red";
-                    }
+                    statusDiv.innerText = "Count: " + median;
+                    statusDiv.style.color = "lime";
                 }
 
                 cv.imshow(canvas, src);
@@ -113,7 +107,6 @@ function startCandyCounter() {
 
             } catch (err) {
                 statusDiv.innerText = "Processing error (see console)";
-                statusDiv.style.color = "red";
                 console.error(err);
             }
         }
