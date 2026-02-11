@@ -40,8 +40,11 @@ function startCandyCounter() {
         const rgb = new cv.Mat();
         const hsv = new cv.Mat();
         const mask = new cv.Mat();
-        const lowerYellow = new cv.Scalar(20, 100, 100, 0);
-        const upperYellow = new cv.Scalar(35, 255, 255, 255);
+
+        // Some OpenCV.js builds don't accept cv.Scalar for inRange;
+        // use 1x1 Mat bounds for maximum compatibility.
+        const lowerYellow = cv.matFromArray(1, 1, cv.CV_8UC3, [20, 100, 100]);
+        const upperYellow = cv.matFromArray(1, 1, cv.CV_8UC3, [35, 255, 255]);
 
         function process() {
             try {
@@ -52,7 +55,6 @@ function startCandyCounter() {
                     return;
                 }
 
-                // Use a 2-step conversion for broader OpenCV.js compatibility.
                 cv.cvtColor(src, rgb, cv.COLOR_RGBA2RGB);
                 cv.cvtColor(rgb, hsv, cv.COLOR_RGB2HSV);
                 cv.inRange(hsv, lowerYellow, upperYellow, mask);
