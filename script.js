@@ -19,28 +19,56 @@ function startCandyCounter() {
             console.error(err);
         });
 
-    video.addEventListener("loadeddata", () => {
+    // Wait until real resolution is known
+    video.onloadedmetadata = () => {
+        const width = video.videoWidth;
+        const height = video.videoHeight;
+
+        console.log("Video size:", width, height);
+
+        if (!width || !height) {
+            statusDiv.innerText = "Video size error";
+            statusDiv.style.color = "red";
+            return;
+        }
+
+        // Match canvas to camera resolution
+        canvas.width = width;
+        canvas.height = height;
+
         statusDiv.innerText = "Processing...";
 
         const cap = new cv.VideoCapture(video);
-        const src = new cv.Mat(video.height, video.width, cv.CV_8UC4);
+        const src = new cv.Mat(height, width, cv.CV_8UC4);
         const hsv = new cv.Mat();
         const mask = new cv.Mat();
+
         const lowerYellow = new cv.Scalar(20, 100, 100, 0);
         const upperYellow = new cv.Scalar(35, 255, 255, 255);
 
         function process() {
             try {
                 cap.read(src);
+
+                // Safety check (prevents cvtColor crash)
+                if (src.empty()) {
+                    requestAnimationFrame(process);
+                    return;
+                }
+
                 cv.cvtColor(src, hsv, cv.COLOR_RGBA2HSV);
                 cv.inRange(hsv, lowerYellow, upperYellow, mask);
 
                 const contours = new cv.MatVector();
                 const hierarchy = new cv.Mat();
 
-                cv.findContours(mask, contours, hierarchy,
+                cv.findContours(
+                    mask,
+                    contours,
+                    hierarchy,
                     cv.RETR_EXTERNAL,
-                    cv.CHAIN_APPROX_SIMPLE);
+                    cv.CHAIN_APPROX_SIMPLE
+                );
 
                 let count = 0;
                 for (let i = 0; i < contours.size(); i++) {
@@ -53,10 +81,9 @@ function startCandyCounter() {
                 contours.delete();
                 hierarchy.delete();
 
+                // Stability history
                 history.push(count);
-                if (history.length > MAX_HISTORY) {
-                    history.shift();
-                }
+                if (history.length > MAX_HISTORY) history.shift();
 
                 let stable = false;
                 if (history.length === MAX_HISTORY) {
@@ -83,6 +110,7 @@ function startCandyCounter() {
 
                 cv.imshow(canvas, src);
                 requestAnimationFrame(process);
+
             } catch (err) {
                 statusDiv.innerText = "Processing error (see console)";
                 statusDiv.style.color = "red";
@@ -91,6 +119,5 @@ function startCandyCounter() {
         }
 
         process();
-    }, { once: true });
+    };
 }
-
