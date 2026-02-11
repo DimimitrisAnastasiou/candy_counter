@@ -4,6 +4,9 @@
     <title>Candy Counter</title>
     <link rel="stylesheet" href="style.css">
 
+    <!-- Load your script FIRST -->
+    <script src="script.js"></script>
+
     <script>
         var Module = {
             onRuntimeInitialized() {
@@ -12,6 +15,7 @@
         };
     </script>
 
+    <!-- Then load OpenCV -->
     <script async src="https://docs.opencv.org/4.x/opencv.js"></script>
 </head>
 
@@ -23,8 +27,6 @@
 
     <div id="status">Loading OpenCV...</div>
 
-    <script src="script.js"></script>
 </body>
 </html>
-
 
