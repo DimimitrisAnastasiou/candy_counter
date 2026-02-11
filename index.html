@@ -3,16 +3,28 @@
 <head>
     <title>Candy Counter</title>
     <link rel="stylesheet" href="style.css">
+
+    <script>
+        var Module = {
+            onRuntimeInitialized() {
+                startCandyCounter();
+            }
+        };
+    </script>
+
     <script async src="https://docs.opencv.org/4.x/opencv.js"></script>
 </head>
+
 <body>
     <h1>Candy Counter</h1>
 
-    <video id="video" autoplay playsinline></video>
-    <canvas id="canvas"></canvas>
+    <video id="video" autoplay playsinline width="640" height="480"></video>
+    <canvas id="canvas" width="640" height="480"></canvas>
 
-    <div id="status">Loading...</div>
+    <div id="status">Loading OpenCV...</div>
 
     <script src="script.js"></script>
 </body>
 </html>
+
+
