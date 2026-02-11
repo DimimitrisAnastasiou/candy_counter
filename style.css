@@ -1,0 +1,16 @@
+body {
+    text-align: center;
+    background: #111;
+    color: white;
+    font-family: Arial;
+}
+
+video, canvas {
+    width: 600px;
+    border: 2px solid white;
+}
+
+#status {
+    font-size: 40px;
+    margin-top: 20px;
+}
