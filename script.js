@@ -67,11 +67,31 @@ function startCandyCounter() {
                 for (let i = 0; i < contours.size(); i++) {
                     const contour = contours.get(i);
                     const area = cv.contourArea(contour);
-                    contour.delete();
+                
                     if (area > 120 && area < 5000) {
                         count++;
+                
+                        // Draw contour (green)
+                        cv.drawContours(src, contours, i,
+                            new cv.Scalar(0, 255, 0, 255), 2);
+                
+                        // Draw center (blue)
+                        const moments = cv.moments(contour);
+                        if (moments.m00 !== 0) {
+                            const cx = moments.m10 / moments.m00;
+                            const cy = moments.m01 / moments.m00;
+                            cv.circle(src,
+                                new cv.Point(cx, cy),
+                                10,
+                                new cv.Scalar(255, 0, 0, 255),
+                                2
+                            );
+                        }
                     }
+                
+                    contour.delete();
                 }
+
 
                 contours.delete();
                 hierarchy.delete();
@@ -116,3 +136,4 @@ function startCandyCounter() {
         process();
     }, { once: true });
 }
+
