@@ -4,19 +4,21 @@
     <title>Candy Counter</title>
     <link rel="stylesheet" href="style.css">
 
-    <!-- Load your script FIRST -->
-    <script src="script.js"></script>
-
+    <!-- Module MUST exist before OpenCV loads -->
     <script>
         var Module = {
             onRuntimeInitialized() {
+                console.log("OpenCV ready");
                 startCandyCounter();
             }
         };
     </script>
 
-    <!-- Then load OpenCV -->
-    <script src="https://docs.opencv.org/4.x/opencv.js"></script>
+    <!-- OpenCV -->
+    <script async src="https://docs.opencv.org/4.x/opencv.js"></script>
+
+    <!-- Your code AFTER OpenCV definition -->
+    <script src="script.js"></script>
 </head>
 
 <body>
@@ -29,5 +31,6 @@
 
 </body>
 </html>
+
 
 
